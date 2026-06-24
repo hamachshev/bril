@@ -1,0 +1,13 @@
+@main {
+  x: int = div c b;
+  v: int = const 4;
+  v2: int = const 9;
+  v3: int = add v2 v;
+  v4: int = const 9;
+  y: int = div c b;
+  v5: int = add v2 v;
+  print x;
+  print y;
+  print v5;
+  ret;
+}

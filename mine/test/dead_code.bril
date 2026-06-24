@@ -1,0 +1,12 @@
+@main {
+  v: int = const 4;
+  v: int = const 9;
+  v2: int = const 4;
+  v3: int = add v2 v;
+  jmp .somewhere;
+  v: int = const 2;
+  jmp .somewhere;
+.somewhere:
+  print v;
+  ret;
+}
