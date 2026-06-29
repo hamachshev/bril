@@ -4,7 +4,7 @@ import sys
 from mycfg import form_blocks
 
 
-def unused_vars(program):
+def unused_vars(program) -> bool:
     """
     loop until have not changed
     on each loop get all the used vars
@@ -12,30 +12,27 @@ def unused_vars(program):
     if not used, remove the const statement
     """
 
-    while True:
-        used_vars = set()
-        changed = False
-        # used var pass
-        for func in program["functions"]:
-            for instr in func["instrs"]:
-                if "args" in instr:
-                    for arg in instr["args"]:
-                        used_vars.add(arg)
+    used_vars = set()
+    changed = False
+    # used var pass
+    for func in program["functions"]:
+        for instr in func["instrs"]:
+            if "args" in instr:
+                for arg in instr["args"]:
+                    used_vars.add(arg)
 
-        # shake the unused vars
+    # shake the unused vars
 
-        for func in program["functions"]:
-            new_instrs = []
+    for func in program["functions"]:
+        new_instrs = []
 
-            for instr in func["instrs"]:
-                if "dest" in instr and instr["dest"] not in used_vars:
-                    changed = True
-                    continue
-                new_instrs.append(instr)
-            func["instrs"] = new_instrs
-
-        if not changed:
-            break
+        for instr in func["instrs"]:
+            if "dest" in instr and instr["dest"] not in used_vars:
+                changed = True
+                continue
+            new_instrs.append(instr)
+        func["instrs"] = new_instrs
+    return changed
 
 
 def reassigned_before_use(block):
@@ -46,8 +43,8 @@ def reassigned_before_use(block):
     if we get to another of the same dest, before its removed from last assn
     then remove old instr by rewriting it in the new array and return the new array
     """
-    new = []
     last_assign = {}
+    changed = False
 
     for i, instr in enumerate(block):
         if "args" in instr:
@@ -57,12 +54,12 @@ def reassigned_before_use(block):
 
         if "dest" in instr:
             if instr["dest"] in last_assign:  # ie its being reassinged
-                new[last_assign[instr["dest"]]] = instr
+                block[last_assign[instr["dest"]]] = instr
                 last_assign[instr["dest"]] = i
+                changed = True
                 continue
             last_assign[instr["dest"]] = i
-        new.append(instr)
-    return new
+    return changed
 
 
 def run():

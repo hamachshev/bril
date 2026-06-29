@@ -14,7 +14,10 @@ def add_nonlocal(block, lvn_table, env):
     we need if we use a non local var, like an arg,
     basically a var that has no decl in this block
     to be added to the lvn table and env
-    so
+    --- I forgot why we need this ---
+    but as far as i can tell it is because if reassigned later,
+    we need to remove all the instrs that depend on it and as such cached the variable
+    and if it is not in the table, it wont be removed
     """
 
     seen = set()
@@ -22,7 +25,7 @@ def add_nonlocal(block, lvn_table, env):
         if "args" in instr:
             for arg in instr["args"]:
                 if arg not in seen:
-                    value = Value("id", (arg))
+                    value = Value("id", (arg,))  # this comma is killing me!
                     lvn_table[value] = arg
                     env[arg] = value
                     seen.add(arg)
@@ -120,11 +123,13 @@ def lvn(block):
     apply lvn to a block.
     this includes constant folding
     subexpression elimination
+    returns a boolean indicating wether things were changed
     """
     env = {}  # mapping of vars to keys (of values) in lvn table
     lvn_table = (
         {}
     )  # table with cannonical home and key (tuple) for the value so key -> cannonical home
+    changed = False
 
     add_nonlocal(block, lvn_table, env)
 
@@ -132,7 +137,9 @@ def lvn(block):
         new_args = []
         if "args" in instr:
             for arg in instr["args"]:
-                if arg not in env:
+                if (
+                    arg not in env
+                ):  # not sure why the arg would not be in the env??? FIX: we added nonlocals already!
                     new_args.append(arg)
                 else:
                     key = env[arg]
@@ -153,6 +160,7 @@ def lvn(block):
                 "dest": instr["dest"],
                 "type": instr["type"],
             }
+            changed = True
             continue
 
         # if not assigning to var (ie no dest)
@@ -173,11 +181,18 @@ def lvn(block):
                 # there is f -> mult a b if we dont do this we will do f -> id c
                 # but thats wrong bc c is using b from before and now b is updated
                 del env[instr["dest"]]
-                for key in list(lvn_table.keys()):
+                for lvn_entry in list(lvn_table.keys()):
                     if instr["dest"] in key.args:
-                        if lvn_table[key] in env:
-                            del env[lvn_table[key]]
-                            del lvn_table[key]
+                        # find all the envs that point to this lvn_entry and remove them
+                        # before was doing if lvn_table[lvn_entry] in env:
+                        # then delete the env entry and the lvn_table entry.
+                        # this was a mistake bc then only deleted the canonical home from the env
+                        # not the other vars pointing at the canonical home.
+                        # (thanks claude code for help understanding this! :)
+                        for var, key in env.copy().items():
+                            if key == lvn_entry:
+                                del env[var]
+                        del lvn_table[lvn_entry]
 
             # either save as canon or retrieve cannon
             if instr["op"] != "call":
@@ -204,6 +219,7 @@ def lvn(block):
                         "dest": instr["dest"],
                         "type": instr["type"],
                     }
+                    changed = True
                     continue
                 # otherwise, it is a new value, so add var to env
                 # and value to lvn_table -> cannonical home
@@ -228,7 +244,7 @@ def lvn(block):
                 lvn_table[key] = dest
 
                 env[instr["dest"]] = key
-    return block
+    return changed
 
 
 def run():
@@ -239,7 +255,11 @@ def run():
         for block in blocks:
             lvn(block)
         func["instrs"] = [line for block in blocks for line in block]
-    dce.unused_vars(program)
+    while True:
+        changed = False
+        changed |= dce.unused_vars(program)
+        if not changed:
+            break
     print(json.dumps(program))
 
 
