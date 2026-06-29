@@ -1,0 +1,13 @@
+@main(n: int): int {
+  x: int = const 1;
+  cond: bool = gt n x;
+  br cond .big .small;
+.big:
+  y: int = add x n;
+  jmp .end;
+.small:
+  y: int = sub n x;
+  jmp .end;
+.end:
+  ret y;
+}
